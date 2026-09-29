@@ -1,21 +1,28 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
+  ArrowLeft,
   ArrowUp,
   Backpack,
+  BookOpen,
   ChevronRight,
   CirclePause,
   CirclePlay,
   Coins,
+  LogOut,
   Hammer,
   Heart,
   LockKeyhole,
+  Maximize2,
   Map,
   Moon,
   Move,
   Pickaxe,
+  Play,
   Settings,
   Sparkles,
+  Volume2,
+  VolumeX,
   X,
   Zap,
 } from 'lucide-react';
@@ -30,6 +37,118 @@ import { Route, Switch, useLocation, Router as WouterRouter } from 'wouter';
 const queryClient = new QueryClient();
 
 type Panel = 'inventory' | 'crafting' | 'map' | 'pause' | null;
+type TitleModal = 'settings' | 'credits' | 'exit' | null;
+
+const TITLE_SCREEN_ASSET = `${import.meta.env.BASE_URL}assets/ui/emberwild-title-screen.png`;
+
+function StartScreen({ onPlay }: { onPlay: () => void }) {
+  const [modal, setModal] = useState<TitleModal>(null);
+  const [soundEnabled, setSoundEnabled] = useState(
+    () => window.localStorage.getItem('emberwild-sound') !== 'off',
+  );
+
+  const toggleSound = () => {
+    setSoundEnabled((current) => {
+      const next = !current;
+      window.localStorage.setItem('emberwild-sound', next ? 'on' : 'off');
+      return next;
+    });
+  };
+
+  const enterFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen?.();
+    }
+  };
+
+  const tryToExit = () => {
+    window.close();
+    setModal('exit');
+  };
+
+  return (
+    <main className="title-screen" data-testid="title-screen">
+      <div
+        className="title-artboard"
+        style={{ backgroundImage: `url("${TITLE_SCREEN_ASSET}")` }}
+        aria-label="Emberwild: pantalla principal"
+      >
+        <div className="title-hitboxes" aria-label="Menú principal">
+          <button className="title-hitbox title-play" onClick={onPlay} data-testid="button-title-play">
+            <Play className="sr-only" aria-hidden="true" />
+            <span className="sr-only">Jugar</span>
+          </button>
+          <button className="title-hitbox title-settings" onClick={() => setModal('settings')} data-testid="button-title-settings">
+            <Settings className="sr-only" aria-hidden="true" />
+            <span className="sr-only">Ajustes</span>
+          </button>
+          <button className="title-hitbox title-credits" onClick={() => setModal('credits')} data-testid="button-title-credits">
+            <BookOpen className="sr-only" aria-hidden="true" />
+            <span className="sr-only">Créditos</span>
+          </button>
+          <button className="title-hitbox title-exit" onClick={tryToExit} data-testid="button-title-exit">
+            <LogOut className="sr-only" aria-hidden="true" />
+            <span className="sr-only">Salir</span>
+          </button>
+        </div>
+      </div>
+
+      {modal && (
+        <div className="title-modal-backdrop" role="presentation">
+          <section className="title-modal" role="dialog" aria-modal="true" aria-labelledby="title-modal-heading">
+            <div className="title-modal-header">
+              <div>
+                <p className="title-modal-eyebrow">EMBERWILD · FIELD NOTES</p>
+                <h1 id="title-modal-heading">
+                  {modal === 'settings' && 'Ajustes'}
+                  {modal === 'credits' && 'Créditos'}
+                  {modal === 'exit' && 'Hasta pronto'}
+                </h1>
+              </div>
+              <button className="title-modal-close" onClick={() => setModal(null)} aria-label="Cerrar">
+                <X size={18} />
+              </button>
+            </div>
+
+            {modal === 'settings' && (
+              <div className="title-settings-content">
+                <button className="title-setting-row" onClick={toggleSound} data-testid="button-title-sound">
+                  <span className="title-setting-icon">{soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</span>
+                  <span><strong>Efectos de sonido</strong><small>{soundEnabled ? 'Activados' : 'Desactivados'}</small></span>
+                  <span className={`title-toggle ${soundEnabled ? 'on' : ''}`}><i /></span>
+                </button>
+                <button className="title-setting-row" onClick={enterFullscreen} data-testid="button-title-fullscreen">
+                  <span className="title-setting-icon"><Maximize2 size={18} /></span>
+                  <span><strong>Pantalla completa</strong><small>Expandir el campamento</small></span>
+                  <ArrowLeft className="title-setting-arrow" size={16} />
+                </button>
+              </div>
+            )}
+
+            {modal === 'credits' && (
+              <div className="title-credits-content">
+                <div className="title-credits-mark">E</div>
+                <p><strong>Emberwild</strong> es una aventura original de exploración, recolección y crafting.</p>
+                <small>Diseño, código y mundo: Emberwild team<br />Arte de referencia: Adventure Lab</small>
+              </div>
+            )}
+
+            {modal === 'exit' && (
+              <div className="title-exit-content">
+                <p>El navegador no siempre permite cerrar una pestaña desde una aplicación web.</p>
+                <small>Podés cerrar esta pestaña cuando quieras. Tu partida queda guardada automáticamente.</small>
+              </div>
+            )}
+
+            <button className="title-modal-back" onClick={() => setModal(null)}>
+              <ArrowLeft size={16} /> Volver al menú
+            </button>
+          </section>
+        </div>
+      )}
+    </main>
+  );
+}
 
 function StatBar({
   icon: Icon,
@@ -367,11 +486,16 @@ function Router() {
   return (
     <RoutedErrorBoundary>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/" component={GameEntry} />
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
   );
+}
+
+function GameEntry() {
+  const [started, setStarted] = useState(false);
+  return started ? <Home /> : <StartScreen onPlay={() => setStarted(true)} />;
 }
 
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {

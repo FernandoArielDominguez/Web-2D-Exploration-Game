@@ -1,0 +1,1 @@
+- [Sprite-sheet animation](sprite-sheet-animation.md) — each atlas row can use its own frame spacing, and dark atlas backgrounds need transparency before compositing.

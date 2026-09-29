@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -40,6 +40,184 @@ type Panel = 'inventory' | 'crafting' | 'map' | 'pause' | null;
 type TitleModal = 'settings' | 'credits' | 'exit' | null;
 
 const TITLE_SCREEN_ASSET = `${import.meta.env.BASE_URL}assets/ui/emberwild-title-screen.png`;
+const ENVIRONMENT_SHEET_ASSET = `${import.meta.env.BASE_URL}assets/sprites/emberwild-environment-sheet.png`;
+const CHARACTER_SHEET_ASSET = `${import.meta.env.BASE_URL}assets/sprites/emberwild-character-sheet.png`;
+
+type TitleAnimationTrack = {
+  sheet: 'environment' | 'character';
+  sourceX: number;
+  sourceY: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  frameStride: number;
+  destinationX: number;
+  destinationY: number;
+  destinationWidth: number;
+  destinationHeight: number;
+  frameDuration: number;
+  opacity: number;
+  composite: GlobalCompositeOperation;
+};
+
+function TitleAmbientAnimations() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) {
+      return undefined;
+    }
+
+    let animationFrame = 0;
+    let disposed = false;
+    let started = false;
+    const spriteSheets = {
+      environment: new Image(),
+      character: new Image(),
+    };
+    const processedSheets: Record<'environment' | 'character', HTMLCanvasElement | null> = {
+      environment: null,
+      character: null,
+    };
+    spriteSheets.environment.src = ENVIRONMENT_SHEET_ASSET;
+    spriteSheets.character.src = CHARACTER_SHEET_ASSET;
+
+    const tracks: TitleAnimationTrack[] = [
+      {
+        sheet: 'environment',
+        sourceX: 775,
+        sourceY: 194,
+        sourceWidth: 56,
+        sourceHeight: 70,
+        frameStride: 85,
+        destinationX: 1249,
+        destinationY: 31,
+        destinationWidth: 102,
+        destinationHeight: 135,
+        frameDuration: 115,
+        opacity: 0.34,
+        composite: 'screen',
+      },
+      {
+        sheet: 'character',
+        sourceX: 938,
+        sourceY: 75,
+        sourceWidth: 68,
+        sourceHeight: 96,
+        frameStride: 73,
+        destinationX: 412,
+        destinationY: 477,
+        destinationWidth: 91,
+        destinationHeight: 92,
+        frameDuration: 105,
+        opacity: 1,
+        composite: 'screen',
+      },
+      {
+        sheet: 'environment',
+        sourceX: 775,
+        sourceY: 32,
+        sourceWidth: 56,
+        sourceHeight: 50,
+        frameStride: 85,
+        destinationX: 1328,
+        destinationY: 12,
+        destinationWidth: 105,
+        destinationHeight: 105,
+        frameDuration: 140,
+        opacity: 0.2,
+        composite: 'screen',
+      },
+    ];
+
+    const render = (time: number) => {
+      if (disposed) {
+        return;
+      }
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      if (processedSheets.environment && processedSheets.character) {
+        tracks.forEach((track) => {
+          const frame = Math.floor(time / track.frameDuration) % 8;
+          const spriteSheet = processedSheets[track.sheet];
+          if (!spriteSheet) {
+            return;
+          }
+          context.save();
+          context.globalCompositeOperation = track.composite;
+          context.globalAlpha = track.opacity;
+          context.imageSmoothingEnabled = false;
+          context.drawImage(
+            spriteSheet,
+            track.sourceX + frame * track.frameStride,
+            track.sourceY,
+            track.sourceWidth,
+            track.sourceHeight,
+            track.destinationX,
+            track.destinationY,
+            track.destinationWidth,
+            track.destinationHeight,
+          );
+          context.restore();
+        });
+      }
+
+      animationFrame = window.requestAnimationFrame(render);
+    };
+
+    const prepareSpriteSheet = (sheet: HTMLImageElement, name: 'environment' | 'character') => {
+      const surface = document.createElement('canvas');
+      surface.width = sheet.naturalWidth;
+      surface.height = sheet.naturalHeight;
+      const surfaceContext = surface.getContext('2d');
+      if (!surfaceContext) {
+        return;
+      }
+
+      surfaceContext.drawImage(sheet, 0, 0);
+      const imageData = surfaceContext.getImageData(0, 0, surface.width, surface.height);
+      for (let index = 0; index < imageData.data.length; index += 4) {
+        const red = imageData.data[index];
+        const green = imageData.data[index + 1];
+        const blue = imageData.data[index + 2];
+        if (Math.max(red, green, blue) < 48) {
+          imageData.data[index + 3] = 0;
+        }
+      }
+      surfaceContext.putImageData(imageData, 0, 0);
+      processedSheets[name] = surface;
+    };
+
+    const start = () => {
+      if (!disposed && !started && Object.values(spriteSheets).every((sheet) => sheet.complete && sheet.naturalWidth > 0)) {
+        prepareSpriteSheet(spriteSheets.environment, 'environment');
+        prepareSpriteSheet(spriteSheets.character, 'character');
+        started = true;
+        animationFrame = window.requestAnimationFrame(render);
+      }
+    };
+
+    Object.values(spriteSheets).forEach((spriteSheet) => spriteSheet.addEventListener('load', start));
+    start();
+
+    return () => {
+      disposed = true;
+      Object.values(spriteSheets).forEach((spriteSheet) => spriteSheet.removeEventListener('load', start));
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="title-ambient-animations"
+      width="1672"
+      height="941"
+      aria-hidden="true"
+    />
+  );
+}
 
 function StartScreen({ onPlay }: { onPlay: () => void }) {
   const [modal, setModal] = useState<TitleModal>(null);
@@ -73,6 +251,7 @@ function StartScreen({ onPlay }: { onPlay: () => void }) {
         style={{ backgroundImage: `url("${TITLE_SCREEN_ASSET}")` }}
         aria-label="Emberwild: pantalla principal"
       >
+        <TitleAmbientAnimations />
         <div className="title-hitboxes" aria-label="Menú principal">
           <button className="title-hitbox title-play" onClick={onPlay} data-testid="button-title-play">
             <Play className="sr-only" aria-hidden="true" />

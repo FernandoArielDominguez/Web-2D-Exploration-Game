@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Emberwild"
+description = "An original 2D browser exploration game where players gather resources, craft tools, build a camp, face wild creatures, and unlock new regions through a satisfying vertical slice."
+version = "1.0.0"
+id = "artifacts/emberwild"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25639
+
+[services.development]
+run = "pnpm --filter @workspace/emberwild run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/emberwild", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/emberwild/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25639"
+BASE_PATH = "/"

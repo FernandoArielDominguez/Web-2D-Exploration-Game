@@ -41,10 +41,11 @@ type TitleModal = 'settings' | 'credits' | 'exit' | null;
 
 const TITLE_SCREEN_ASSET = `${import.meta.env.BASE_URL}assets/ui/emberwild-title-screen.png`;
 const ENVIRONMENT_SHEET_ASSET = `${import.meta.env.BASE_URL}assets/sprites/emberwild-environment-sheet.png`;
-const CHARACTER_SHEET_ASSET = `${import.meta.env.BASE_URL}assets/sprites/emberwild-character-sheet.png`;
+const FIRE_ANIMATION_SHEET_ASSET = `${import.meta.env.BASE_URL}assets/sprites/emberwild-fire-animation.png`;
+const FIRE_SMOKE_ANIMATION_SHEET_ASSET = `${import.meta.env.BASE_URL}assets/sprites/emberwild-fire-smoke-animation.png`;
 
 type TitleAnimationTrack = {
-  sheet: 'environment' | 'character';
+  sheet: 'environment' | 'fire' | 'smoke';
   sourceX: number;
   sourceY: number;
   sourceWidth: number;
@@ -55,6 +56,7 @@ type TitleAnimationTrack = {
   destinationWidth: number;
   destinationHeight: number;
   frameDuration: number;
+  frameOffset?: number;
   opacity: number;
   composite: GlobalCompositeOperation;
 };
@@ -70,18 +72,22 @@ function TitleAmbientAnimations() {
     }
 
     let animationFrame = 0;
+    let animationStartedAt = 0;
     let disposed = false;
     let started = false;
     const spriteSheets = {
       environment: new Image(),
-      character: new Image(),
+      fire: new Image(),
+      smoke: new Image(),
     };
-    const processedSheets: Record<'environment' | 'character', HTMLCanvasElement | null> = {
+    const processedSheets: Record<'environment' | 'fire' | 'smoke', HTMLCanvasElement | null> = {
       environment: null,
-      character: null,
+      fire: null,
+      smoke: null,
     };
     spriteSheets.environment.src = ENVIRONMENT_SHEET_ASSET;
-    spriteSheets.character.src = CHARACTER_SHEET_ASSET;
+    spriteSheets.fire.src = FIRE_ANIMATION_SHEET_ASSET;
+    spriteSheets.smoke.src = FIRE_SMOKE_ANIMATION_SHEET_ASSET;
 
     const tracks: TitleAnimationTrack[] = [
       {
@@ -100,17 +106,33 @@ function TitleAmbientAnimations() {
         composite: 'source-over',
       },
       {
-        sheet: 'character',
-        sourceX: 944,
-        sourceY: 80,
-        sourceWidth: 56,
-        sourceHeight: 89,
-        frameStride: 73,
-        destinationX: 390,
+        sheet: 'smoke',
+        sourceX: 0,
+        sourceY: 0,
+        sourceWidth: 190,
+        sourceHeight: 160,
+        frameStride: 190,
+        destinationX: 382,
         destinationY: 450,
-        destinationWidth: 128,
-        destinationHeight: 135,
-        frameDuration: 105,
+        destinationWidth: 138,
+        destinationHeight: 116,
+        frameDuration: 155,
+        frameOffset: 3,
+        opacity: 1,
+        composite: 'source-over',
+      },
+      {
+        sheet: 'fire',
+        sourceX: 0,
+        sourceY: 0,
+        sourceWidth: 190,
+        sourceHeight: 220,
+        frameStride: 190,
+        destinationX: 382,
+        destinationY: 466,
+        destinationWidth: 138,
+        destinationHeight: 144,
+        frameDuration: 110,
         opacity: 1,
         composite: 'source-over',
       },
@@ -122,9 +144,10 @@ function TitleAmbientAnimations() {
       }
 
       context.clearRect(0, 0, canvas.width, canvas.height);
-      if (processedSheets.environment && processedSheets.character) {
+      if (processedSheets.environment && processedSheets.fire && processedSheets.smoke) {
         tracks.forEach((track) => {
-          const frame = Math.floor(time / track.frameDuration) % 8;
+          const elapsed = time - animationStartedAt;
+          const frame = (Math.floor(elapsed / track.frameDuration) + (track.frameOffset ?? 0)) % 8;
           const spriteSheet = processedSheets[track.sheet];
           if (!spriteSheet) {
             return;
@@ -151,7 +174,7 @@ function TitleAmbientAnimations() {
       animationFrame = window.requestAnimationFrame(render);
     };
 
-    const prepareSpriteSheet = (sheet: HTMLImageElement, name: 'environment' | 'character') => {
+    const prepareSpriteSheet = (sheet: HTMLImageElement, name: 'environment' | 'fire' | 'smoke') => {
       const surface = document.createElement('canvas');
       surface.width = sheet.naturalWidth;
       surface.height = sheet.naturalHeight;
@@ -161,27 +184,31 @@ function TitleAmbientAnimations() {
       }
 
       surfaceContext.drawImage(sheet, 0, 0);
-      const imageData = surfaceContext.getImageData(0, 0, surface.width, surface.height);
-      for (let index = 0; index < imageData.data.length; index += 4) {
-        const red = imageData.data[index];
-        const green = imageData.data[index + 1];
-        const blue = imageData.data[index + 2];
-        const darkest = Math.max(red, green, blue) < 55;
-        const neutralDark = Math.max(red, green, blue) - Math.min(red, green, blue) < 14
-          && (red + green + blue) / 3 < 95;
-        if (darkest || neutralDark) {
-          imageData.data[index + 3] = 0;
+      if (name === 'environment') {
+        const imageData = surfaceContext.getImageData(0, 0, surface.width, surface.height);
+        for (let index = 0; index < imageData.data.length; index += 4) {
+          const red = imageData.data[index];
+          const green = imageData.data[index + 1];
+          const blue = imageData.data[index + 2];
+          const darkest = Math.max(red, green, blue) < 55;
+          const neutralDark = Math.max(red, green, blue) - Math.min(red, green, blue) < 14
+            && (red + green + blue) / 3 < 95;
+          if (darkest || neutralDark) {
+            imageData.data[index + 3] = 0;
+          }
         }
+        surfaceContext.putImageData(imageData, 0, 0);
       }
-      surfaceContext.putImageData(imageData, 0, 0);
       processedSheets[name] = surface;
     };
 
     const start = () => {
       if (!disposed && !started && Object.values(spriteSheets).every((sheet) => sheet.complete && sheet.naturalWidth > 0)) {
         prepareSpriteSheet(spriteSheets.environment, 'environment');
-        prepareSpriteSheet(spriteSheets.character, 'character');
+        prepareSpriteSheet(spriteSheets.fire, 'fire');
+        prepareSpriteSheet(spriteSheets.smoke, 'smoke');
         started = true;
+        animationStartedAt = performance.now();
         animationFrame = window.requestAnimationFrame(render);
       }
     };

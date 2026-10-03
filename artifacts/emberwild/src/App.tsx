@@ -86,48 +86,33 @@ function TitleAmbientAnimations() {
     const tracks: TitleAnimationTrack[] = [
       {
         sheet: 'environment',
-        sourceX: 775,
-        sourceY: 194,
-        sourceWidth: 56,
-        sourceHeight: 70,
+        sourceX: 779,
+        sourceY: 198,
+        sourceWidth: 60,
+        sourceHeight: 67,
         frameStride: 85,
-        destinationX: 1249,
-        destinationY: 31,
-        destinationWidth: 102,
-        destinationHeight: 135,
+        destinationX: 1372,
+        destinationY: 0,
+        destinationWidth: 135,
+        destinationHeight: 184,
         frameDuration: 115,
-        opacity: 0.34,
-        composite: 'screen',
+        opacity: 1,
+        composite: 'source-over',
       },
       {
         sheet: 'character',
-        sourceX: 938,
-        sourceY: 75,
-        sourceWidth: 68,
-        sourceHeight: 96,
+        sourceX: 944,
+        sourceY: 80,
+        sourceWidth: 56,
+        sourceHeight: 89,
         frameStride: 73,
-        destinationX: 412,
-        destinationY: 477,
-        destinationWidth: 91,
-        destinationHeight: 92,
+        destinationX: 390,
+        destinationY: 450,
+        destinationWidth: 128,
+        destinationHeight: 135,
         frameDuration: 105,
         opacity: 1,
-        composite: 'screen',
-      },
-      {
-        sheet: 'environment',
-        sourceX: 775,
-        sourceY: 32,
-        sourceWidth: 56,
-        sourceHeight: 50,
-        frameStride: 85,
-        destinationX: 1328,
-        destinationY: 12,
-        destinationWidth: 105,
-        destinationHeight: 105,
-        frameDuration: 140,
-        opacity: 0.2,
-        composite: 'screen',
+        composite: 'source-over',
       },
     ];
 
@@ -181,7 +166,10 @@ function TitleAmbientAnimations() {
         const red = imageData.data[index];
         const green = imageData.data[index + 1];
         const blue = imageData.data[index + 2];
-        if (Math.max(red, green, blue) < 48) {
+        const darkest = Math.max(red, green, blue) < 55;
+        const neutralDark = Math.max(red, green, blue) - Math.min(red, green, blue) < 14
+          && (red + green + blue) / 3 < 95;
+        if (darkest || neutralDark) {
           imageData.data[index + 3] = 0;
         }
       }
